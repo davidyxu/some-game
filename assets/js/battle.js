@@ -7,7 +7,7 @@ SG = {
 		SG.view.initialize();
 		SG.player.initialize();
 		
-		window.setInterval(SG.update, 60);
+		window.setInterval(SG.update, 45);
 	},
 	update: function() {
 		SG.keyHandler();
@@ -46,9 +46,7 @@ SG.view = {
 SG.preloader = {
 	initialize: function() {
 		SG.assets = {};
-		SG.preloader.loadImage('player', '/images/temp');
-		SG.preloader.loadImage('player', '/images/temp');
-		SG.preloader.loadImage('player', '/images/temp');
+		SG.preloader.loadImage('player', '/images/spritesheet');
 	},
 	loadImage: function(key, src) {
 		SG.assets[key] = {};
@@ -87,26 +85,26 @@ SG.inputController = {
 	type: {
 		battle: function() {
 			if (SG.inputController.active[37]) { // left
-				SG.player.force.x -= SG.player.current_state.air ? 2 : 4;
+				SG.player.force.x -= SG.player.current_state.air ? 1 : 3;
 				SG.player.current_state.direction = -1;
 			}
 			if (SG.inputController.active[38]) { // up
 				if (SG.player.current_state.air > 0) {
-					if (SG.player.current_state.air < 4) { SG.player.force.y += 3; }
+					if (SG.player.current_state.air < 5) { SG.player.force.y += 4; }
 				} else {
-					SG.player.force.y += 16;
+					SG.player.force.y += 14;
 					SG.player.current_state.air = 1;
 				}
 			}
 			if (SG.inputController.active[39]) { // right
-				SG.player.force.x += SG.player.current_state.air ? 2 : 4;
+				SG.player.force.x += SG.player.current_state.air ? 1 : 3;
 				SG.player.current_state.direction = 1;
 			}
 			if (SG.inputController.active[40]) { // down
 				//SG.player.force.y += 2;
 			}
-			if (Math.abs(SG.player.force.x) >= 12) {
-				SG.player.force.x = SG.player.force.x > 0 ? 12 : -12;
+			if (Math.abs(SG.player.force.x) > 8) {
+				SG.player.force.x = SG.player.force.x > 0 ? 8 : -8;
 			}
 		},
 		menu: function() {
@@ -141,7 +139,7 @@ SG.inputController = {
 
 SG.player = {
 	health: 100,
-	current_state: {direction: 1, status: 'idle'},
+	current_state: {direction: 1, status: 'idle', frame: 0},
 	last_state: {air: 1},
 	force: {x: 0, y: 0},
 	x: 1,	
@@ -181,19 +179,32 @@ SG.player = {
 		}
 	},
 	draw: function() {
-		var width = SG.assets['player'].right.width;
-		var height = SG.assets['player'].right.height;
 		if (SG.player.current_state.direction > 0) {
-			SG.view.context.drawImage(SG.assets['player'].right, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height);
+			SG.view.context.drawImage(SG.assets['player'].right, SG.player.getSprite()*60, 0, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);
 		} else {
-			SG.view.context.drawImage(SG.assets['player'].left, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height);	
+			SG.view.context.drawImage(SG.assets['player'].left, (8-SG.player.getSprite())*60, 0, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);	
 		}
+		console.log(SG.player.getSprite());
 		SG.view.context.fillRect(SG.player.x, SG.player.y,3,3);// temp draw point viewer
+	},
+	getSprite: function() {
+		if (SG.player.current_state.air) { return 5; }
+		switch (SG.player.current_state.status) {
+			case 'idle':
+				return 0;
+				break;
+			case 'walking':
+				return 1 + SG.player.current_state.frame;
+				break;
+			default:
+				return 0;	
+		}
 	},
 	moveY: function() {
 		if (SG.player.last_state.air > 0) {
 			SG.player.current_state.air = SG.player.last_state.air + 1;
 		}
+		SG.player.force.y -= 2;
 		var collision = false;
 		SG.player.y -= Math.round(SG.player.force.y);
 		while (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
@@ -201,36 +212,40 @@ SG.player = {
 			SG.player.current_state.air = 0;
 			collision = true;
 		}
-		if (SG.player.current_state.air > 0) {
-			SG.player.force.y -= 2;
-		} else if (collision) {
+		if (collision) {
 			SG.player.force.y = 0;
 		}
 	},
 
 	moveX: function() {
 		if (SG.player.force.x != 0) {
-			SG.player.current_state.status = SG.inputController.active[16] ? 'running' : 'walking';
-			console.log(SG.player.current_state.status);
 			if (SG.inputController.active[16]) {
  				SG.player.x += Math.round(SG.player.force.x * 1.5);
 			} else {
 				SG.player.x += Math.round(SG.player.force.x);
 			}
 			// record last force, if decreased significantly then slide
-			if (SG.player.last_state) { SG.player.force.x *= 0.8; }
-			if (Math.abs(SG.player.force.x) <= 0.5) {
+			if (!SG.player.last_state.air) { SG.player.force.x *= 0.8; }
+			if (Math.abs(SG.player.force.x) < 1) {
 				SG.player.force.x = 0;
 			}
 		}
 		if (SG.player.force.x == 0) {
 			SG.player.current_state.status = 'idle';
+			SG.player.frame = 0;
+		} else {
+			SG.player.current_state.status = 'walking';
+			if (SG.player.last_state.status === 'walking') {
+				SG.player.current_state.frame++;
+				if (SG.player.current_state.frame > 7) { SG.player.current_state.frame = 0 }
+			}
 		}
 	},
 
 	update: function() {
 		SG.player.moveX();
 		SG.player.moveY();
+		console.log(SG.player.current_state.status);
 
 		SG.player.last_state = SG.player.current_state;
 	}
