@@ -81,9 +81,24 @@ SG.stateController = {
 
 // key listener controller
 SG.inputController = {
-	active: {37: false, 38: false, 39: false, 40: false, 16: false},
+	active: {
+		37: false, // left
+		38: false, // up
+		39: false, // right
+		40: false, // down
+		16: false, // shift
+		90: false, // z
+		88: false,
+	},
 	type: {
 		battle: function() {
+			if (SG.inputController.active[90]) {
+				console.log('light');
+				if (!SG.player.current_attack.type) { SG.player.moves.light(); }
+			}
+			if (SG.inputController.active[88]) {
+				if (!SG.player.current_attack.type) { SG.player.moves.heavy(); }
+			}
 			if (SG.inputController.active[37]) { // left
 				SG.player.force.x -= SG.player.current_state.air ? 1 : 3;
 				SG.player.current_state.direction = -1;
@@ -130,6 +145,7 @@ SG.inputController = {
 	},
 
 	keyDown: function(e) {
+		console.log(e.keyCode);
 		if (SG.inputController.active[e.keyCode] === false) { SG.inputController.active[e.keyCode] = true }	
 	},
 	keyUp: function(e) {
@@ -142,6 +158,14 @@ SG.player = {
 	current_state: {direction: 1, status: 'idle', frame: 0},
 	last_state: {air: 1},
 	force: {x: 0, y: 0},
+	current_attack: {
+		type: null,
+		frame: 0,
+		reset: function() {
+			SG.player.current_attack.type = null;
+			SG.player.current_attack.frame = 0;
+		}
+	},
 	x: 1,	
 	y: 2, // temp
 	initialize: function() {
@@ -155,9 +179,16 @@ SG.player = {
 		SG.player.widthBounds = SG.player.width - 1;
 	},
 	moves: {
-		light: function() {},
+		light: function() {
+			SG.inputController.active[90] = false;
+			SG.player.current_attack.type = 'light';
+			SG.player.current_attack.frame = 0;
+		},
 		medium: function() {},
-		heavy: function() {},
+		heavy: function() {
+			SG.player.current_attack.type = 'heavy';
+			SG.player.current_attack.frame = 0;
+		},
 		special: function() {}
 	},
 	hitbox: function() {//offsetX, offsetY) {
@@ -179,26 +210,40 @@ SG.player = {
 		}
 	},
 	draw: function() {
+		var spriteCoord = SG.player.getSprite();
 		if (SG.player.current_state.direction > 0) {
-			SG.view.context.drawImage(SG.assets['player'].right, SG.player.getSprite()*60, 0, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);
+			SG.view.context.drawImage(SG.assets['player'].right, (10-spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);
 		} else {
-			SG.view.context.drawImage(SG.assets['player'].left, (8-SG.player.getSprite())*60, 0, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);	
+			SG.view.context.drawImage(SG.assets['player'].left, (spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);	
 		}
-		console.log(SG.player.getSprite());
 		SG.view.context.fillRect(SG.player.x, SG.player.y,3,3);// temp draw point viewer
 	},
 	getSprite: function() {
-		if (SG.player.current_state.air) { return 5; }
+		switch (SG.player.current_attack.type) {
+			case null:
+				break;
+			case 'light':
+				return [SG.player.current_attack.frame-1, 1];
+				break;
+			case 'heavy':
+				return [SG.player.current_attack.frame-1, 2];
+				break;
+		}
+		if (SG.player.current_state.air) { return [5, 0]; }
 		switch (SG.player.current_state.status) {
 			case 'idle':
-				return 0;
+				return [0, 0];
 				break;
 			case 'walking':
-				return 1 + SG.player.current_state.frame;
+				return [1 + SG.player.current_state.frame, 0];
 				break;
 			default:
-				return 0;	
+				return [0, 0];	
 		}
+	},
+	move: function() {
+		SG.player.moveX();
+		SG.player.moveY();
 	},
 	moveY: function() {
 		if (SG.player.last_state.air > 0) {
@@ -218,6 +263,7 @@ SG.player = {
 	},
 
 	moveX: function() {
+		if (SG.player.current_attack.current) { SG.player.force.x *= 0.8; }
 		if (SG.player.force.x != 0) {
 			if (SG.inputController.active[16]) {
  				SG.player.x += Math.round(SG.player.force.x * 1.5);
@@ -245,8 +291,25 @@ SG.player = {
 	update: function() {
 		SG.player.moveX();
 		SG.player.moveY();
-		console.log(SG.player.current_state.status);
-
+		if (SG.player.current_attack.type) {
+			switch (SG.player.current_attack.type) {
+				case 'light':
+					if (SG.player.current_attack.frame > 5) {
+						SG.player.current_attack.reset();
+					} else {
+						SG.player.current_attack.frame++;	
+					}
+					break;
+				case 'heavy':
+					if (SG.player.current_attack.frame > 8) {
+						SG.player.current_attack.reset();
+					} else {
+						SG.player.current_attack.frame++;	
+					}
+					break;
+			}
+			
+		}
 		SG.player.last_state = SG.player.current_state;
 	}
 };
@@ -261,14 +324,6 @@ SG.collisions = {
 		}
 	},
 	rectangleCheck: function(hitboxA, hotboxB) {
-		// if ((hitboxA.bl.x > hitboxB.tl.x || hitboxA.bl.y > hitboxB.tl.y) ||
-		// 		() ||
-		// 		() ||
-		// 		() {
-		// 	return true
-		// } else {
-		// 	return false
-		// }
 	}
 };
 SG.battle = {
