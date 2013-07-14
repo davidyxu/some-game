@@ -83,7 +83,7 @@ SG.stateController = {
 
 // key listener controller
 SG.inputController = {
-	active: {37: false, 38: false, 39: false, 40: false},
+	active: {37: false, 38: false, 39: false, 40: false, 16: false},
 	type: {
 		battle: function() {
 			if (SG.inputController.active[37]) { // left
@@ -91,10 +91,11 @@ SG.inputController = {
 				SG.player.current_state.direction = -1;
 			}
 			if (SG.inputController.active[38]) { // up
-				if (SG.player.current_state.air) {
-
+				if (SG.player.current_state.air > 0) {
+					if (SG.player.current_state.air < 4) { SG.player.force.y += 3; }
 				} else {
-					SG.player.force.y += 20;
+					SG.player.force.y += 16;
+					SG.player.current_state.air = 1;
 				}
 			}
 			if (SG.inputController.active[39]) { // right
@@ -141,7 +142,7 @@ SG.inputController = {
 SG.player = {
 	health: 100,
 	current_state: {direction: 1, status: 'idle'},
-	last_state: {air: true},
+	last_state: {air: 1},
 	force: {x: 0, y: 0},
 	x: 1,	
 	y: 2, // temp
@@ -179,7 +180,6 @@ SG.player = {
 					}
 		}
 	},
-	center: {},
 	draw: function() {
 		var width = SG.assets['player'].right.width;
 		var height = SG.assets['player'].right.height;
@@ -190,42 +190,52 @@ SG.player = {
 		}
 		SG.view.context.fillRect(SG.player.x, SG.player.y,3,3);// temp draw point viewer
 	},
+	moveY: function() {
+		if (SG.player.last_state.air > 0) {
+			SG.player.current_state.air = SG.player.last_state.air + 1;
+		}
+		var collision = false;
+		SG.player.y -= Math.round(SG.player.force.y);
+		while (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
+			SG.player.y -= SG.player.force.y ? 1 : number !== 0 ? -1 : 0;
+			SG.player.current_state.air = 0;
+			collision = true;
+		}
+		if (SG.player.current_state.air > 0) {
+			SG.player.force.y -= 2;
+		} else if (collision) {
+			SG.player.force.y = 0;
+		}
+	},
 
-	move: function() {
+	moveX: function() {
 		if (SG.player.force.x != 0) {
-			SG.player.current_state.status = 'walking'
-			SG.player.x += Math.round(SG.player.force.x);
+			SG.player.current_state.status = SG.inputController.active[16] ? 'running' : 'walking';
+			console.log(SG.player.current_state.status);
+			if (SG.inputController.active[16]) {
+ 				SG.player.x += Math.round(SG.player.force.x * 1.5);
+			} else {
+				SG.player.x += Math.round(SG.player.force.x);
+			}
 			// record last force, if decreased significantly then slide
 			if (SG.player.last_state) { SG.player.force.x *= 0.8; }
 			if (Math.abs(SG.player.force.x) <= 0.5) {
 				SG.player.force.x = 0;
 			}
 		}
-	},
-
-	update: function() {
-		SG.player.move();
-		if (SG.player.last_state.air = true) {
-			SG.player.current_state.air = true;
-		}
-		SG.player.y -= Math.round(SG.player.force.y);
-		while (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
-			SG.player.y -= SG.player.force.y ? 1 : number !== 0 ? -1 : 0;
-			SG.player.current_state.air = false;
-		}
-		if (SG.player.last_state.air) {
-			SG.player.force.y -= 2;
-		}
 		if (SG.player.force.x == 0) {
 			SG.player.current_state.status = 'idle';
 		}
+	},
 
-		if (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
-			console.log('collision');
-		}
+	update: function() {
+		SG.player.moveX();
+		SG.player.moveY();
+
 		SG.player.last_state = SG.player.current_state;
 	}
 };
+
 SG.collisions = {
 	groundCollision: function(hitboxA, hitboxB) { // temp hardcoding
 		if ((hitboxA.br.y >= SG.view.canvas.height - 100) ||
