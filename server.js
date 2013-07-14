@@ -6,11 +6,11 @@ var express = require('express')
 
 app.use(express.static(__dirname + '/assets'));
 
-server.listen(8080);
-
 app.get('/', function(req, res) {
 	res.sendfile(__dirname + '/client.html');
 });
+
+server.listen(8080);
 
 io.sockets.on('connection', function(socket) {
 	socket.on('login', function(data) {

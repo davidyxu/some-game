@@ -3,26 +3,72 @@ SG = {
 	game_state: 'battle', // temp
 	initialize: function(canvas) {
 		SG.canvas = "";
-		SG.keyHandler = SG.controller(battle); // temp
+		SG.inputController.initialize()	; // temp
+		SG.view.initialize();
+		SG.player.initialize();
+		
+		window.setInterval(SG.update, 60);
+	},
+	update: function() {
+		SG.keyHandler();
+		SG.player.update();
+
+		SG.view.update();
+	},
+};
+
+SG.view = {
+	resizeCanvas: function() {
+		SG.view.canvas.width = window.innerWidth;
+    SG.view.canvas.height = window.innerHeight;
+	},
+	clear: function() {
+		SG.view.context.clearRect(0, 0, SG.view.canvas.width, SG.view.canvas.height);
+	},
+	update: function() {
+		SG.view.clear();
+		SG.view.drawBackground();
+		SG.player.draw();
+	},
+	drawBackground: function() {
+		SG.view.context.fillRect(0, SG.view.canvas.height - 100, SG.view.canvas.width,3);
+	},
+	initialize: function() {
+		SG.preloader.initialize();
+		SG.view.canvas = document.getElementById('game-view');
+    SG.view.context = SG.view.canvas.getContext('2d');
+    SG.view.resizeCanvas();
+
+		window.addEventListener('resize', SG.view.resizeCanvas, false);
+	},
+}
+
+SG.preloader = {
+	initialize: function() {
+		SG.assets = {};
+		SG.preloader.loadImage('player', '/images/temp');
+		SG.preloader.loadImage('player', '/images/temp');
+		SG.preloader.loadImage('player', '/images/temp');
+	},
+	loadImage: function(key, src) {
+		SG.assets[key] = {};
+		SG.assets[key].left = document.createElement('img');
+		SG.assets[key].left.className = 'preloaded';
+		SG.assets[key].left.setAttribute('src', src + '-l.png');
+		SG.assets[key].left.setAttribute('id', key);
+
+		SG.assets[key].right = document.createElement('img');
+		SG.assets[key].right.className = 'preloaded';
+		SG.assets[key].right.setAttribute('src', src + '-r.png');
+		SG.assets[key].right.setAttribute('id', key);
 	}
 };
-SG.view = {
-	initialize: function() {
-		var canvas = document.getElementById('game-view');
-    var context = canvas.getContext('2d');
-		window.addEventListener('resize', resizeCanvas, false);
-	},
-	resizeCanvas: function() {
-		canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-	}
-}
+
 //game state controller
 SG.stateController = {
 	type: {
 		battle: {
 			a: function() {
-				SG.game
 			},
 			b: function() {
 
@@ -31,15 +77,36 @@ SG.stateController = {
 	},
 	switchState: function(state) {
 		SG.game_state = state
-		SG.controller.switchHandler;
+		SG.inputController.switchHandler;
 	}
 };
 
 // key listener controller
-SG.controller = {
+SG.inputController = {
 	active: {37: false, 38: false, 39: false, 40: false},
 	type: {
 		battle: function() {
+			if (SG.inputController.active[37]) { // left
+				SG.player.force.x -= SG.player.current_state.air ? 2 : 4;
+				SG.player.current_state.direction = -1;
+			}
+			if (SG.inputController.active[38]) { // up
+				if (SG.player.current_state.air) {
+
+				} else {
+					SG.player.force.y += 20;
+				}
+			}
+			if (SG.inputController.active[39]) { // right
+				SG.player.force.x += SG.player.current_state.air ? 2 : 4;
+				SG.player.current_state.direction = 1;
+			}
+			if (SG.inputController.active[40]) { // down
+				//SG.player.force.y += 2;
+			}
+			if (Math.abs(SG.player.force.x) >= 12) {
+				SG.player.force.x = SG.player.force.x > 0 ? 12 : -12;
+			}
 		},
 		menu: function() {
 		}
@@ -49,7 +116,7 @@ SG.controller = {
 		switch (SG.game_state)
 		{
 			case 'battle':
-				SG.controller.installHandler(SG.controller.type.battle);
+				SG.inputController.installHandler(SG.inputController.type.battle);
 				break;
 
 		}
@@ -58,36 +125,127 @@ SG.controller = {
 		SG.keyHandler = type;
 	},
 	initialize: function() {
-		SG.controller.switchHandler();
-		window.addEventListener('keydown', SG.controller.keyDown, false);
-		window.addEventListener('keyup', SG.controller.keyUp, false);
+		SG.inputController.switchHandler();
+		window.addEventListener('keydown', SG.inputController.keyDown, false);
+		window.addEventListener('keyup', SG.inputController.keyUp, false);
 	},
 
 	keyDown: function(e) {
-		console.log(SG.controller.active);
-		if (SG.controller.active[e.keyCode] === false) { SG.controller.active[e.keyCode] = true }	
+		if (SG.inputController.active[e.keyCode] === false) { SG.inputController.active[e.keyCode] = true }	
 	},
 	keyUp: function(e) {
-		if (SG.controller.active[e.keyCode]) { SG.controller.active[e.keyCode] = false }
+		if (SG.inputController.active[e.keyCode]) { SG.inputController.active[e.keyCode] = false }
 	}
 };
 
 SG.player = {
 	health: 100,
-	coordinates: {x: 1, y: 2}, // tempe
+	current_state: {direction: 1, status: 'idle'},
+	last_state: {air: true},
+	force: {x: 0, y: 0},
+	x: 1,	
+	y: 2, // temp
 	initialize: function() {
 		// get shits from server
 		// override with shits
 		// maybe ajax requests for skills
+
+		SG.player.width = 50; // temp hardcoded, from server
+		SG.player.height = 59;
+		SG.player.heightBounds = SG.player.height - 1;
+		SG.player.widthBounds = SG.player.width - 1;
 	},
 	moves: {
 		light: function() {},
 		medium: function() {},
 		heavy: function() {},
 		special: function() {}
+	},
+	hitbox: function() {//offsetX, offsetY) {
+		var offsetX = 0;
+		var offsetY = 0;
+		return {
+			tl: {	x: SG.player.x - SG.player.widthBounds + offsetX,
+						y: SG.player.y - SG.player.height - offsetY
+					},
+			tr: {	x: SG.player.x + SG.player.widthBounds + offsetX,
+						y: SG.player.y - SG.player.height - offsetY
+					},
+			bl: { x: SG.player.x - SG.player.widthBounds + offsetX,
+						y: SG.player.y - offsetY
+					},
+			br: { x: SG.player.x + SG.player.widthBounds + offsetX,
+						y: SG.player.y - offsetY
+					}
+		}
+	},
+	center: {},
+	draw: function() {
+		var width = SG.assets['player'].right.width;
+		var height = SG.assets['player'].right.height;
+		if (SG.player.current_state.direction > 0) {
+			SG.view.context.drawImage(SG.assets['player'].right, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height);
+		} else {
+			SG.view.context.drawImage(SG.assets['player'].left, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height);	
+		}
+		SG.view.context.fillRect(SG.player.x, SG.player.y,3,3);// temp draw point viewer
+	},
+
+	move: function() {
+		if (SG.player.force.x != 0) {
+			SG.player.current_state.status = 'walking'
+			SG.player.x += Math.round(SG.player.force.x);
+			// record last force, if decreased significantly then slide
+			if (SG.player.last_state) { SG.player.force.x *= 0.8; }
+			if (Math.abs(SG.player.force.x) <= 0.5) {
+				SG.player.force.x = 0;
+			}
+		}
+	},
+
+	update: function() {
+		SG.player.move();
+		if (SG.player.last_state.air = true) {
+			SG.player.current_state.air = true;
+		}
+		SG.player.y -= Math.round(SG.player.force.y);
+		while (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
+			SG.player.y -= SG.player.force.y ? 1 : number !== 0 ? -1 : 0;
+			SG.player.current_state.air = false;
+		}
+		if (SG.player.last_state.air) {
+			SG.player.force.y -= 2;
+		}
+		if (SG.player.force.x == 0) {
+			SG.player.current_state.status = 'idle';
+		}
+
+		if (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
+			console.log('collision');
+		}
+		SG.player.last_state = SG.player.current_state;
 	}
 };
-
+SG.collisions = {
+	groundCollision: function(hitboxA, hitboxB) { // temp hardcoding
+		if ((hitboxA.br.y >= SG.view.canvas.height - 100) ||
+			  (hitboxA.bl.y >= SG.view.canvas.height - 100)) {
+			return true
+		} else {
+			return false
+		}
+	},
+	rectangleCheck: function(hitboxA, hotboxB) {
+		// if ((hitboxA.bl.x > hitboxB.tl.x || hitboxA.bl.y > hitboxB.tl.y) ||
+		// 		() ||
+		// 		() ||
+		// 		() {
+		// 	return true
+		// } else {
+		// 	return false
+		// }
+	}
+};
 SG.battle = {
 	enemys: [],
 	initialize: function() {
@@ -99,6 +257,8 @@ SG.battle = {
 	},
 
 	update: function() {
-
+		//delta = {SG}
 	},
 };
+
+SG.initialize();
