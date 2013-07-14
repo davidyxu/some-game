@@ -4,19 +4,25 @@ var express = require('express')
 	, server = http.createServer(app)
 	, io = require('socket.io').listen(server);
 
+
+io.configure(function () { 
+  io.set("transports", ["xhr-polling"]); 
+  io.set("polling duration", 10); 
+});
+
 app.use(express.static(__dirname + '/assets'));
 
 app.get('/', function(req, res) {
 	res.sendfile(__dirname + '/client.html');
 });
 
-server.listen(8080);
+var port = process.env.PORT || 5000;
+
+server.listen(port);
 
 io.sockets.on('connection', function(socket) {
-	socket.on('login', function(data) {
-		socket.emit('start', function(data) {
+	socket.emit('start', function(data) {
 
-		});
 	});
 	socket.on('update', function(data) {
 
