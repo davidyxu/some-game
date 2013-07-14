@@ -263,7 +263,7 @@ SG.player = {
 	},
 
 	moveX: function() {
-		if (SG.player.current_attack.current) { SG.player.force.x *= 0.8; }
+		if (SG.player.current_attack.current) { SG.player.force.x *= 0.6; }
 		if (SG.player.force.x != 0) {
 			if (SG.inputController.active[16]) {
  				SG.player.x += Math.round(SG.player.force.x * 1.5);
