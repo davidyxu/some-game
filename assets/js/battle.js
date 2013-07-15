@@ -93,33 +93,32 @@ SG.inputController = {
 	type: {
 		battle: function() {
 			if (SG.inputController.active[90]) {
-				console.log('light');
-				if (!SG.player.current_attack.type) { SG.player.moves.light(); }
+				if (!SG.player.state.attack.type) { SG.player.moves.light(); }
 			}
 			if (SG.inputController.active[88]) {
-				if (!SG.player.current_attack.type) { SG.player.moves.heavy(); }
+				if (!SG.player.state.attack.type) { SG.player.moves.heavy(); }
 			}
 			if (SG.inputController.active[37]) { // left
-				SG.player.force.x -= SG.player.current_state.air ? 1 : 3;
-				SG.player.current_state.direction = -1;
+				SG.player.state.force.x -= SG.player.state.air ? 1 : 3;
+				SG.player.state.direction = -1;
 			}
 			if (SG.inputController.active[38]) { // up
-				if (SG.player.current_state.air > 0) {
-					if (SG.player.current_state.air < 5) { SG.player.force.y += 4; }
+				if (SG.player.state.air > 0) {
+					if (SG.player.state.air < 5) { SG.player.state.force.y += 4; }
 				} else {
-					SG.player.force.y += 14;
-					SG.player.current_state.air = 1;
+					SG.player.state.force.y += 14;
+					SG.player.state.air = 1;
 				}
 			}
 			if (SG.inputController.active[39]) { // right
-				SG.player.force.x += SG.player.current_state.air ? 1 : 3;
-				SG.player.current_state.direction = 1;
+				SG.player.state.force.x += SG.player.state.air ? 1 : 3;
+				SG.player.state.direction = 1;
 			}
 			if (SG.inputController.active[40]) { // down
-				//SG.player.force.y += 2;
+				//SG.player.state.force.y += 2;
 			}
-			if (Math.abs(SG.player.force.x) > 8) {
-				SG.player.force.x = SG.player.force.x > 0 ? 8 : -8;
+			if (Math.abs(SG.player.state.force.x) > 8) {
+				SG.player.state.force.x = SG.player.state.force.x > 0 ? 8 : -8;
 			}
 		},
 		menu: function() {
@@ -145,7 +144,6 @@ SG.inputController = {
 	},
 
 	keyDown: function(e) {
-		console.log(e.keyCode);
 		if (SG.inputController.active[e.keyCode] === false) { SG.inputController.active[e.keyCode] = true }	
 	},
 	keyUp: function(e) {
@@ -155,17 +153,7 @@ SG.inputController = {
 
 SG.player = {
 	health: 100,
-	current_state: {direction: 1, status: 'idle', frame: 0},
-	last_state: {air: 1},
-	force: {x: 0, y: 0},
-	current_attack: {
-		type: null,
-		frame: 0,
-		reset: function() {
-			SG.player.current_attack.type = null;
-			SG.player.current_attack.frame = 0;
-		}
-	},
+	state: {air: 0, frame: 0, attack: {}, status: 'idle', force: {x: 0, y: 0} },
 	x: 1,	
 	y: 2, // temp
 	initialize: function() {
@@ -181,13 +169,13 @@ SG.player = {
 	moves: {
 		light: function() {
 			SG.inputController.active[90] = false;
-			SG.player.current_attack.type = 'light';
-			SG.player.current_attack.frame = 0;
+			SG.player.state.attack.type = 'light';
+			SG.player.state.frame = 0;
 		},
 		medium: function() {},
 		heavy: function() {
-			SG.player.current_attack.type = 'heavy';
-			SG.player.current_attack.frame = 0;
+			SG.player.state.attack.type = 'heavy';
+			SG.player.state.frame = 0;
 		},
 		special: function() {}
 	},
@@ -196,121 +184,130 @@ SG.player = {
 		var offsetY = 0;
 		return {
 			tl: {	x: SG.player.x - SG.player.widthBounds + offsetX,
-						y: SG.player.y - SG.player.height - offsetY
-					},
+					y: SG.player.y - SG.player.height - offsetY
+				},
 			tr: {	x: SG.player.x + SG.player.widthBounds + offsetX,
-						y: SG.player.y - SG.player.height - offsetY
-					},
-			bl: { x: SG.player.x - SG.player.widthBounds + offsetX,
-						y: SG.player.y - offsetY
-					},
-			br: { x: SG.player.x + SG.player.widthBounds + offsetX,
-						y: SG.player.y - offsetY
-					}
+					y: SG.player.y - SG.player.height - offsetY
+				},
+			bl: { 	x: SG.player.x - SG.player.widthBounds + offsetX,
+					y: SG.player.y - offsetY
+				},
+			br: {	x: SG.player.x + SG.player.widthBounds + offsetX,
+					y: SG.player.y - offsetY
+				}
 		}
 	},
+	
 	draw: function() {
 		var spriteCoord = SG.player.getSprite();
-		if (SG.player.current_state.direction > 0) {
+		if (SG.player.state.direction > 0) {
 			SG.view.context.drawImage(SG.assets['player'].right, (10-spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);
 		} else {
 			SG.view.context.drawImage(SG.assets['player'].left, (spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);	
 		}
 		SG.view.context.fillRect(SG.player.x, SG.player.y,3,3);// temp draw point viewer
 	},
+
 	getSprite: function() {
-		switch (SG.player.current_attack.type) {
+		SG.player.updateFrame();
+		switch (SG.player.state.attack.type) {
 			case null:
 				break;
 			case 'light':
-				return [SG.player.current_attack.frame-1, 1];
+				return [SG.player.state.frame-1, 1];
 				break;
 			case 'heavy':
-				return [SG.player.current_attack.frame-1, 2];
+				return [SG.player.state.frame-1, 2];
 				break;
 		}
-		if (SG.player.current_state.air) { return [5, 0]; }
-		switch (SG.player.current_state.status) {
+		if (SG.player.state.air) { return [6, 0]; }
+		switch (SG.player.state.status) {
 			case 'idle':
 				return [0, 0];
 				break;
 			case 'walking':
-				return [1 + SG.player.current_state.frame, 0];
+				return [1 + SG.player.state.frame, 0];
 				break;
 			default:
 				return [0, 0];	
 		}
 	},
+
 	move: function() {
 		SG.player.moveX();
 		SG.player.moveY();
 	},
+
 	moveY: function() {
-		if (SG.player.last_state.air > 0) {
-			SG.player.current_state.air = SG.player.last_state.air + 1;
+		if (SG.player.state.air > 0) {
+			SG.player.state.air++;
 		}
-		SG.player.force.y -= 2;
+		SG.player.state.force.y -= 2;
 		var collision = false;
-		SG.player.y -= Math.round(SG.player.force.y);
+		SG.player.y -= Math.round(SG.player.state.force.y);
 		while (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
-			SG.player.y -= SG.player.force.y ? 1 : number !== 0 ? -1 : 0;
-			SG.player.current_state.air = 0;
+			SG.player.y -= SG.player.state.force.y ? 1 : number !== 0 ? -1 : 0;
+			SG.player.state.air = 0;
 			collision = true;
 		}
 		if (collision) {
-			SG.player.force.y = 0;
+			SG.player.state.force.y = 0;
 		}
 	},
 
 	moveX: function() {
-		if (SG.player.current_attack.current) { SG.player.force.x *= 0.6; }
-		if (SG.player.force.x != 0) {
+		if (SG.player.state.attack.type) { SG.player.state.force.x *= 0.8; }
+		if (SG.player.state.force.x != 0) {
 			if (SG.inputController.active[16]) {
- 				SG.player.x += Math.round(SG.player.force.x * 1.5);
+ 				SG.player.x += Math.round(SG.player.state.force.x * 1.5);
 			} else {
-				SG.player.x += Math.round(SG.player.force.x);
+				SG.player.x += Math.round(SG.player.state.force.x);
 			}
 			// record last force, if decreased significantly then slide
-			if (!SG.player.last_state.air) { SG.player.force.x *= 0.8; }
-			if (Math.abs(SG.player.force.x) < 1) {
-				SG.player.force.x = 0;
+			if (!SG.player.state.air) { SG.player.state.force.x *= 0.8; }
+			if (Math.abs(SG.player.state.force.x) < 1) {
+				SG.player.state.force.x = 0;
 			}
 		}
-		if (SG.player.force.x == 0) {
-			SG.player.current_state.status = 'idle';
+		
+	},
+
+	updateFrame: function() {
+		if (SG.player.state.attack.type) {
+			switch (SG.player.state.attack.type) {
+				case 'light':
+					if (SG.player.state.frame > 5) {
+						SG.player.state.frame=0;
+						SG.player.state.attack.type = null;
+					} else {
+						SG.player.state.frame++;	
+					}
+					break;
+				case 'heavy':
+					if (SG.player.state.frame > 8) {
+						SG.player.state.frame=0;
+						SG.player.state.attack.type = null;
+					} else {
+						SG.player.state.frame++;	
+					}
+					break;
+			}
+		} else if (SG.player.state.force.x == 0) {
+			SG.player.state.status = 'idle';
 			SG.player.frame = 0;
 		} else {
-			SG.player.current_state.status = 'walking';
-			if (SG.player.last_state.status === 'walking') {
-				SG.player.current_state.frame++;
-				if (SG.player.current_state.frame > 7) { SG.player.current_state.frame = 0 }
+			SG.player.state.status = 'walking';
+			if (SG.player.state.status === 'walking') {
+				SG.player.state.frame++;
+				if (SG.player.state.frame > 7) { SG.player.state.frame = 0 }
 			}
 		}
 	},
 
 	update: function() {
+		console.log(SG.player.state.frame);
 		SG.player.moveX();
 		SG.player.moveY();
-		if (SG.player.current_attack.type) {
-			switch (SG.player.current_attack.type) {
-				case 'light':
-					if (SG.player.current_attack.frame > 5) {
-						SG.player.current_attack.reset();
-					} else {
-						SG.player.current_attack.frame++;	
-					}
-					break;
-				case 'heavy':
-					if (SG.player.current_attack.frame > 8) {
-						SG.player.current_attack.reset();
-					} else {
-						SG.player.current_attack.frame++;	
-					}
-					break;
-			}
-			
-		}
-		SG.player.last_state = SG.player.current_state;
 	}
 };
 
