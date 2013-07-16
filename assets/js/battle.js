@@ -7,11 +7,13 @@ SG = {
 		SG.view.initialize();
 		SG.player.initialize();
 		
+		SG.battle.initialize();
 		window.setInterval(SG.update, 45);
 	},
 	update: function() {
 		SG.keyHandler();
 		SG.player.update();
+		SG.battle.update();
 
 		SG.view.update();
 	},
@@ -20,7 +22,7 @@ SG = {
 SG.view = {
 	resizeCanvas: function() {
 		SG.view.canvas.width = window.innerWidth;
-    SG.view.canvas.height = window.innerHeight;
+	    SG.view.canvas.height = window.innerHeight;
 	},
 	clear: function() {
 		SG.view.context.clearRect(0, 0, SG.view.canvas.width, SG.view.canvas.height);
@@ -29,6 +31,9 @@ SG.view = {
 		SG.view.clear();
 		SG.view.drawBackground();
 		SG.player.draw();
+		for (var i = 0; i < SG.battle.enemies.length; i++) {
+			SG.battle.enemies[i].draw();
+		};
 	},
 	drawBackground: function() {
 		SG.view.context.fillRect(0, SG.view.canvas.height - 100, SG.view.canvas.width,3);
@@ -36,8 +41,8 @@ SG.view = {
 	initialize: function() {
 		SG.preloader.initialize();
 		SG.view.canvas = document.getElementById('game-view');
-    SG.view.context = SG.view.canvas.getContext('2d');
-    SG.view.resizeCanvas();
+	    SG.view.context = SG.view.canvas.getContext('2d');
+	    SG.view.resizeCanvas();
 
 		window.addEventListener('resize', SG.view.resizeCanvas, false);
 	},
@@ -151,182 +156,207 @@ SG.inputController = {
 	}
 };
 
-SG.player = {
-	health: 100,
-	state: {air: 0, frame: 0, attack: {}, status: 'idle', force: {x: 0, y: 0} },
-	x: 1,	
-	y: 2, // temp
-	initialize: function() {
-		// get shits from server
-		// override with shits
-		// maybe ajax requests for skills
 
-		SG.player.width = 50; // temp hardcoded, from server
-		SG.player.height = 59;
-		SG.player.heightBounds = SG.player.height - 1;
-		SG.player.widthBounds = SG.player.width - 1;
-	},
-	moves: {
-		light: function() {
-			SG.inputController.active[90] = false;
-			SG.player.state.attack.type = 'light';
-			SG.player.state.frame = 0;
-		},
-		medium: function() {},
-		heavy: function() {
-			SG.player.state.attack.type = 'heavy';
-			SG.player.state.frame = 0;
-		},
-		special: function() {}
-	},
-	hitbox: function() {//offsetX, offsetY) {
-		var offsetX = 0;
-		var offsetY = 0;
-		return {
-			tl: {	x: SG.player.x - SG.player.widthBounds + offsetX,
-					y: SG.player.y - SG.player.height - offsetY
-				},
-			tr: {	x: SG.player.x + SG.player.widthBounds + offsetX,
-					y: SG.player.y - SG.player.height - offsetY
-				},
-			bl: { 	x: SG.player.x - SG.player.widthBounds + offsetX,
-					y: SG.player.y - offsetY
-				},
-			br: {	x: SG.player.x + SG.player.widthBounds + offsetX,
-					y: SG.player.y - offsetY
-				}
-		}
-	},
-	
-	draw: function() {
-		var spriteCoord = SG.player.getSprite();
-		if (SG.player.state.direction > 0) {
-			SG.view.context.drawImage(SG.assets['player'].right, (10-spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);
+function BattleEntity(x, y) {
+	this.x = x;
+	this.y = y;
+	this.state = {health: 0, air: 0, frame: 0, attack: {},  status: 'idle', force: {x: 0, y: 0}};
+	this.width = 60;
+	this.height = 60;
+};
+
+BattleEntity.prototype.move = function() {
+	this.moveX();
+	this.moveY();
+};
+
+BattleEntity.prototype.moveX = function() {
+	if (this.state.attack.type) { this.state.force.x *= 0.8; }
+	if (this.state.force.x != 0) {
+		if (SG.inputController.active[16]) {
+				this.x += Math.round(this.state.force.x * 1.5);
 		} else {
-			SG.view.context.drawImage(SG.assets['player'].left, (spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, SG.player.x - SG.player.width/2, SG.player.y - SG.player.height, 60, 60);	
+			this.x += Math.round(this.state.force.x);
 		}
-		SG.view.context.fillRect(SG.player.x, SG.player.y,3,3);// temp draw point viewer
-	},
-
-	getSprite: function() {
-		SG.player.updateFrame();
-		switch (SG.player.state.attack.type) {
-			case null:
-				break;
-			case 'light':
-				return [SG.player.state.frame-1, 1];
-				break;
-			case 'heavy':
-				return [SG.player.state.frame-1, 2];
-				break;
-		}
-		if (SG.player.state.air) { return [6, 0]; }
-		switch (SG.player.state.status) {
-			case 'idle':
-				return [0, 0];
-				break;
-			case 'walking':
-				return [1 + SG.player.state.frame, 0];
-				break;
-			default:
-				return [0, 0];	
-		}
-	},
-
-	move: function() {
-		SG.player.moveX();
-		SG.player.moveY();
-	},
-
-	moveY: function() {
-		if (SG.player.state.air > 0) {
-			SG.player.state.air++;
-		}
-		SG.player.state.force.y -= 2;
 		var collision = false;
-		SG.player.y -= Math.round(SG.player.state.force.y);
-		while (SG.collisions.groundCollision(SG.player.hitbox(),{})) {
-			SG.player.y -= SG.player.state.force.y ? 1 : number !== 0 ? -1 : 0;
-			SG.player.state.air = 0;
+		while (SG.collisions.battleCollision(this.hitbox())) {
+			this.x -= this.state.force.x? 1 : number !== 0 ? -1 : 0;
 			collision = true;
 		}
 		if (collision) {
-			SG.player.state.force.y = 0;
+			this.state.force.x = 0;
 		}
-	},
-
-	moveX: function() {
-		if (SG.player.state.attack.type) { SG.player.state.force.x *= 0.8; }
-		if (SG.player.state.force.x != 0) {
-			if (SG.inputController.active[16]) {
- 				SG.player.x += Math.round(SG.player.state.force.x * 1.5);
-			} else {
-				SG.player.x += Math.round(SG.player.state.force.x);
-			}
-			// record last force, if decreased significantly then slide
-			if (!SG.player.state.air) { SG.player.state.force.x *= 0.8; }
-			if (Math.abs(SG.player.state.force.x) < 1) {
-				SG.player.state.force.x = 0;
-			}
+		// record last force, if decreased significantly then slide
+		if (!this.state.air) { this.state.force.x *= 0.8; }
+		if (Math.abs(this.state.force.x) < 1) {
+			this.state.force.x = 0;
 		}
-		
-	},
+	}
+};
 
-	updateFrame: function() {
-		if (SG.player.state.attack.type) {
-			switch (SG.player.state.attack.type) {
-				case 'light':
-					if (SG.player.state.frame > 5) {
-						SG.player.state.frame=0;
-						SG.player.state.attack.type = null;
-					} else {
-						SG.player.state.frame++;	
-					}
-					break;
-				case 'heavy':
-					if (SG.player.state.frame > 8) {
-						SG.player.state.frame=0;
-						SG.player.state.attack.type = null;
-					} else {
-						SG.player.state.frame++;	
-					}
-					break;
+BattleEntity.prototype.moveY = function() {
+	if (this.state.air > 0) {
+		this.state.air++;
+	}
+	this.state.force.y -= 2;
+	var collision = false;
+	this.y -= Math.round(this.state.force.y);
+	while (SG.collisions.battleCollision(this.hitbox())) {
+		this.y -= this.state.force.y ? 1 : number !== 0 ? -1 : 0;
+		this.state.air = 0;
+		collision = true;
+	}
+	if (collision) {
+		this.state.force.y = 0;
+	}
+};
+
+BattleEntity.prototype.hitbox = function() {//offsetX, offsetY) {
+	return {
+		tl: {	x: this.x - this.width/2 + this.offsetX,
+				y: this.y - this.height - this.offsetY
+			},
+		tr: {	x: this.x + this.width/2 - this.offsetX,
+				y: this.y - this.height - this.offsetY
+			},
+		bl: { 	x: this.x - this.width/2 + this.offsetX,
+				y: this.y - this.offsetY
+			},
+		br: {	x: this.x + this.width/2 - this.offsetX,
+				y: this.y - this.offsetY
 			}
-		} else if (SG.player.state.force.x == 0) {
-			SG.player.state.status = 'idle';
-			SG.player.frame = 0;
-		} else {
-			SG.player.state.status = 'walking';
-			if (SG.player.state.status === 'walking') {
-				SG.player.state.frame++;
-				if (SG.player.state.frame > 7) { SG.player.state.frame = 0 }
-			}
+	}
+};
+
+BattleEntity.prototype.draw = function() {
+	var spriteCoord = SG.player.getSprite();
+	if (this.state.direction > 0) {
+		SG.view.context.drawImage(SG.assets[this.assets].right, (10-spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, this.x - this.width/2, this.y - this.height, 60, 60);
+	} else {
+		SG.view.context.drawImage(SG.assets[this.assets].left, (spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, this.x - this.width/2, this.y - this.height, 60, 60);	
+	}
+	SG.view.context.fillRect(this.x, this.y,3,3);// temp draw point viewer
+};
+
+BattleEntity.prototype.update = function() {
+	this.move();
+};
+
+SG.player = new BattleEntity(0, 0);
+
+SG.player.initialize = function() {
+	// get shits from server
+	// override with shits
+	// maybe ajax requests for skills
+
+	this.assets = 'player';
+	this.offsetX = 15;
+	this.offsetY = 1;
+};
+SG.player.moves = {
+	light: function() {
+		SG.inputController.active[90] = false;
+		SG.player.state.attack.type = 'light';
+		SG.player.state.frame = 0;
+	},
+	medium: function() {},
+	heavy: function() {
+		SG.player.state.attack.type = 'heavy';
+		SG.player.state.frame = 0;
+	},
+	special: function() {}
+};
+
+SG.player.getSprite = function() {
+	SG.player.updateFrame();
+	switch (SG.player.state.attack.type) {
+		case null:
+			break;
+		case 'light':
+			return [SG.player.state.frame-1, 1];
+			break;
+		case 'heavy':
+			return [SG.player.state.frame-1, 2];
+			break;
+	}
+	if (SG.player.state.air) { return [6, 0]; }
+	switch (SG.player.state.status) {
+		case 'idle':
+			return [0, 0];
+			break;
+		case 'walking':
+			return [1 + SG.player.state.frame, 0];
+			break;
+		default:
+			return [0, 0];	
+	}
+};
+
+SG.player.updateFrame = function() {
+	if (SG.player.state.attack.type) {
+		switch (SG.player.state.attack.type) {
+			case 'light':
+				if (SG.player.state.frame > 5) {
+					SG.player.state.frame=0;
+					SG.player.state.attack.type = null;
+				} else {
+					SG.player.state.frame++;	
+				}
+				break;
+			case 'heavy':
+				if (SG.player.state.frame > 8) {
+					SG.player.state.frame=0;
+					SG.player.state.attack.type = null;
+				} else {
+					SG.player.state.frame++;	
+				}
+				break;
 		}
-	},
-
-	update: function() {
-		console.log(SG.player.state.frame);
-		SG.player.moveX();
-		SG.player.moveY();
+	} else if (SG.player.state.force.x == 0) {
+		SG.player.state.status = 'idle';
+		SG.player.frame = 0;
+	} else {
+		SG.player.state.status = 'walking';
+		if (SG.player.state.status === 'walking') {
+			SG.player.state.frame++;
+			if (SG.player.state.frame > 7) { SG.player.state.frame = 0 }
+		}
 	}
 };
 
 SG.collisions = {
-	groundCollision: function(hitboxA, hitboxB) { // temp hardcoding
-		if ((hitboxA.br.y >= SG.view.canvas.height - 100) ||
-			  (hitboxA.bl.y >= SG.view.canvas.height - 100)) {
+	battleCollision: function(hitbox) { // temp hardcoding
+		if ((hitbox.br.y >= SG.view.canvas.height - 100) ||
+			  (hitbox.bl.y >= SG.view.canvas.height - 100)) {
 			return true
-		} else {
-			return false
 		}
+
+		var enemy;
+		for (var i = 0; i < SG.battle.enemies.length; i++) {
+			enemy = SG.battle.enemies[i].hitbox();
+			if (hitbox.br.x == enemy.br.x && hitbox.bl.x == enemy.bl.x) {
+				return false; // ghetto fix to self check
+			}
+			if (hitbox.br.x <= enemy.bl.x || hitbox.bl.x >= enemy.br.x) {
+				return false
+			} else {
+				console.log('collision');
+				return true
+			}
+		}
+		return false
 	},
-	rectangleCheck: function(hitboxA, hotboxB) {
-	}
 };
 SG.battle = {
-	enemys: [],
+	enemies: [],
 	initialize: function() {
-
+		var test = new BattleEntity(500, 60);
+		test.assets = 'player';
+		test.offsetX = 15;
+		test.offsetY = 1;
+		test.updateFrame = SG.player.updateFrame;
+		test.getSprite = SG.player.getSprite;
+		SG.battle.enemies.push(test);
 	},
 
 	spawn_enemy: function() {
@@ -334,7 +364,9 @@ SG.battle = {
 	},
 
 	update: function() {
-		//delta = {SG}
+		for (var i = 0; i < SG.battle.enemies.length; i++) {
+			SG.battle.enemies[i].update();
+		};
 	},
 };
 
