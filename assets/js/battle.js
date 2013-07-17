@@ -180,7 +180,7 @@ BattleEntity.prototype.moveX = function() {
 		}
 		var collision = false;
 		while (SG.collisions.battleCollision(this.hitbox())) {
-			this.x -= this.state.force.x? 1 : number !== 0 ? -1 : 0;
+			this.x -= this.state.direction
 			collision = true;
 		}
 		if (collision) {
@@ -214,16 +214,19 @@ BattleEntity.prototype.moveY = function() {
 BattleEntity.prototype.hitbox = function() {//offsetX, offsetY) {
 	return {
 		tl: {	x: this.x - this.width/2 + this.offsetX,
-				y: this.y - this.height - this.offsetY
+				y: this.y - this.height + this.offsetY
 			},
 		tr: {	x: this.x + this.width/2 - this.offsetX,
-				y: this.y - this.height - this.offsetY
+				y: this.y - this.height + this.offsetY
 			},
 		bl: { 	x: this.x - this.width/2 + this.offsetX,
-				y: this.y - this.offsetY
+				y: this.y - 1
 			},
 		br: {	x: this.x + this.width/2 - this.offsetX,
-				y: this.y - this.offsetY
+				y: this.y - 1
+			},
+		bc: {	x: this.x,
+				y: this.y - 1
 			}
 	}
 };
@@ -240,6 +243,8 @@ BattleEntity.prototype.draw = function() {
 
 BattleEntity.prototype.update = function() {
 	this.move();
+	// off until sensible update + validation system
+	// socket.emit('update', SG.player.state);
 };
 
 SG.player = new BattleEntity(0, 0);
@@ -250,9 +255,10 @@ SG.player.initialize = function() {
 	// maybe ajax requests for skills
 
 	this.assets = 'player';
-	this.offsetX = 15;
-	this.offsetY = 1;
+	this.offsetX = 16;
+	this.offsetY = 9;
 };
+
 SG.player.moves = {
 	light: function() {
 		SG.inputController.active[90] = false;
@@ -325,6 +331,7 @@ SG.player.updateFrame = function() {
 };
 
 SG.collisions = {
+	corners: ['br', 'bl', 'tr', 'tl'],
 	battleCollision: function(hitbox) { // temp hardcoding
 		if ((hitbox.br.y >= SG.view.canvas.height - 100) ||
 			  (hitbox.bl.y >= SG.view.canvas.height - 100)) {
@@ -334,14 +341,14 @@ SG.collisions = {
 		var enemy;
 		for (var i = 0; i < SG.battle.enemies.length; i++) {
 			enemy = SG.battle.enemies[i].hitbox();
-			if (hitbox.br.x == enemy.br.x && hitbox.bl.x == enemy.bl.x) {
+			if (hitbox.br.x == enemy.br.x && hitbox.bl.y == enemy.bl.y) {
 				return false; // ghetto fix to self check
 			}
-			if (hitbox.br.x <= enemy.bl.x || hitbox.bl.x >= enemy.br.x) {
-				return false
-			} else {
-				console.log('collision');
-				return true
+			for (var i = 0; i < SG.collisions.corners.length; i++) {
+				if (hitbox[SG.collisions.corners[i]].x <= enemy.br.x && hitbox[SG.collisions.corners[i]].x >= enemy.tl.x &&
+					hitbox[SG.collisions.corners[i]].y <= enemy.br.y && hitbox[SG.collisions.corners[i]].y >= enemy.tl.y) {
+					return true
+				}
 			}
 		}
 		return false
@@ -352,8 +359,8 @@ SG.battle = {
 	initialize: function() {
 		var test = new BattleEntity(500, 60);
 		test.assets = 'player';
-		test.offsetX = 15;
-		test.offsetY = 1;
+		test.offsetX = 16;
+		test.offsetY = 9;
 		test.updateFrame = SG.player.updateFrame;
 		test.getSprite = SG.player.getSprite;
 		SG.battle.enemies.push(test);
@@ -369,5 +376,13 @@ SG.battle = {
 		};
 	},
 };
+
+socket.on('start', function() {
+	console.log('starting');
+});
+socket.on('echo', function(data) {
+	console.log(data);
+	console.log('packet recieved');
+});
 
 SG.initialize();
