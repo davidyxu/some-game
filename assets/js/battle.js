@@ -2,21 +2,30 @@
 SG = {
 	game_state: 'battle', // temp
 	initialize: function(canvas) {
+		SG.overflow = 0;
 		SG.canvas = "";
 		SG.inputController.initialize()	; // temp
 		SG.view.initialize();
 		SG.player.initialize();
 		
 		SG.battle.initialize();
-		window.setInterval(SG.update, 45);
+		time = Date.now();
+		SG.update();
 	},
 	update: function() {
+		//console.log(Date.now()-SG.time);
+		SG.time = Date.now() + SG.overflow; 
 		SG.keyHandler();
 		SG.player.update();
 		SG.battle.update();
-
 		SG.view.update();
+		var timeout = 50 - (Date.now() - SG.time);
+		if (timeout < 0) {SG.overflow = Math.abs(timeout) }
+		window.setTimeout(SG.update, timeout);
 	},
+	ping: function() {
+		socket.emit('ping', Date.now());
+	}
 };
 
 SG.view = {
@@ -155,14 +164,28 @@ SG.inputController = {
 		if (SG.inputController.active[e.keyCode]) { SG.inputController.active[e.keyCode] = false }
 	}
 };
-
-
-function BattleEntity(x, y) {
+function Projectile(x, y, assets, width, height, offsetX, offsetY) {
 	this.x = x;
 	this.y = y;
+	
+	this.assets = assets;
 	this.state = {health: 0, air: 0, frame: 0, attack: {},  status: 'idle', force: {x: 0, y: 0}};
-	this.width = 60;
-	this.height = 60;
+	this.width = width;
+	this.height = height;
+	this.offsetX = offsetX;
+	this.offsetY = offsetY;
+};
+
+function BattleEntity(x, y, assets, width, height, offsetX, offsetY) {
+	this.x = x;
+	this.y = y;
+	
+	this.assets = assets;
+	this.state = {health: 0, air: 0, frame: 0, attack: {},  status: 'idle', force: {x: 0, y: 0}};
+	this.width = width;
+	this.height = height;
+	this.offsetX = offsetX;
+	this.offsetY = offsetY;
 };
 
 BattleEntity.prototype.move = function() {
@@ -190,6 +213,9 @@ BattleEntity.prototype.moveX = function() {
 		if (!this.state.air) { this.state.force.x *= 0.8; }
 		if (Math.abs(this.state.force.x) < 1) {
 			this.state.force.x = 0;
+			this.state.status = 'idle';
+		} else {
+			this.state.status = 'walking';
 		}
 	}
 };
@@ -232,11 +258,11 @@ BattleEntity.prototype.hitbox = function() {//offsetX, offsetY) {
 };
 
 BattleEntity.prototype.draw = function() {
-	var spriteCoord = SG.player.getSprite();
+	var spriteCoord = this.getSprite();
 	if (this.state.direction > 0) {
-		SG.view.context.drawImage(SG.assets[this.assets].right, (10-spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, this.x - this.width/2, this.y - this.height, 60, 60);
+		SG.view.context.drawImage(SG.assets[this.assets].right, (10-spriteCoord[0])*this.width, spriteCoord[1]*this.height, this.width, this.height, this.x - this.width/2, this.y - this.height, this.width, this.height);
 	} else {
-		SG.view.context.drawImage(SG.assets[this.assets].left, (spriteCoord[0])*60, spriteCoord[1]*60, 60, 60, this.x - this.width/2, this.y - this.height, 60, 60);	
+		SG.view.context.drawImage(SG.assets[this.assets].left, (spriteCoord[0])*this.width, spriteCoord[1]*this.height, this.width, this.height, this.x - this.width/2, this.y - this.height, this.width, this.height);	
 	}
 	SG.view.context.fillRect(this.x, this.y,3,3);// temp draw point viewer
 };
@@ -247,16 +273,14 @@ BattleEntity.prototype.update = function() {
 	// socket.emit('update', SG.player.state);
 };
 
-SG.player = new BattleEntity(0, 0);
+// {attack: {light: {maxFrame: 5, spriteRow: 1}, heavy: {maxFrame: 10, spriteRow: 2}}
+SG.player = new BattleEntity(0, 0, 'player', 60, 60, 18, 9);
 
 SG.player.initialize = function() {
 	// get shits from server
 	// override with shits
 	// maybe ajax requests for skills
 
-	this.assets = 'player';
-	this.offsetX = 16;
-	this.offsetY = 9;
 };
 
 SG.player.moves = {
@@ -264,6 +288,7 @@ SG.player.moves = {
 		SG.inputController.active[90] = false;
 		SG.player.state.attack.type = 'light';
 		SG.player.state.frame = 0;
+		SG.player.moves.light.frames = 5;
 	},
 	medium: function() {},
 	heavy: function() {
@@ -273,81 +298,89 @@ SG.player.moves = {
 	special: function() {}
 };
 
-SG.player.getSprite = function() {
-	SG.player.updateFrame();
-	switch (SG.player.state.attack.type) {
+BattleEntity.prototype.getSprite = function() {
+	this.updateFrame();
+	switch (this.state.attack.type) {
 		case null:
 			break;
 		case 'light':
-			return [SG.player.state.frame-1, 1];
+			return [this.state.frame-1, 1];
 			break;
 		case 'heavy':
-			return [SG.player.state.frame-1, 2];
+			return [this.state.frame-1, 2];
 			break;
 	}
-	if (SG.player.state.air) { return [6, 0]; }
-	switch (SG.player.state.status) {
+	if (this.state.air) { return [6, 0]; }
+	switch (this.state.status) {
 		case 'idle':
 			return [0, 0];
 			break;
 		case 'walking':
-			return [1 + SG.player.state.frame, 0];
+			return [1 + this.state.frame, 0];
 			break;
 		default:
 			return [0, 0];	
 	}
 };
 
-SG.player.updateFrame = function() {
-	if (SG.player.state.attack.type) {
-		switch (SG.player.state.attack.type) {
+// todo, add moveset object which contains max frame and row of different actions (idle, walk in one row, attacks in rest)
+
+BattleEntity.prototype.updateFrame = function() {
+	if (this.state.attack.type) {
+		switch (this.state.attack.type) {
 			case 'light':
-				if (SG.player.state.frame > 5) {
-					SG.player.state.frame=0;
-					SG.player.state.attack.type = null;
+				if (this.state.frame > 5) {
+					this.state.frame=0;
+					this.state.attack.type = null;
 				} else {
-					SG.player.state.frame++;	
+					this.state.frame++;	
 				}
 				break;
 			case 'heavy':
-				if (SG.player.state.frame > 8) {
-					SG.player.state.frame=0;
-					SG.player.state.attack.type = null;
+				if (this.state.frame > 8) {
+					this.state.frame=0;
+					this.state.attack.type = null;
 				} else {
-					SG.player.state.frame++;	
+					this.state.frame++;	
 				}
 				break;
 		}
-	} else if (SG.player.state.force.x == 0) {
-		SG.player.state.status = 'idle';
-		SG.player.frame = 0;
 	} else {
-		SG.player.state.status = 'walking';
-		if (SG.player.state.status === 'walking') {
-			SG.player.state.frame++;
-			if (SG.player.state.frame > 7) { SG.player.state.frame = 0 }
+		switch (this.state.status) {
+			case 'idle':
+				this.state.frame = 0;
+				break;
+			case 'walking':
+				this.state.frame++;
+				if (this.state.frame > 7) { this.state.frame = 0 }
+				break;
 		}
-	}
+	} 
 };
 
 SG.collisions = {
 	corners: ['br', 'bl', 'tr', 'tl'],
 	battleCollision: function(hitbox) { // temp hardcoding
+
+		// ground check
 		if ((hitbox.br.y >= SG.view.canvas.height - 100) ||
 			  (hitbox.bl.y >= SG.view.canvas.height - 100)) {
 			return true
 		}
 
-		var enemy;
-		for (var i = 0; i < SG.battle.enemies.length; i++) {
-			enemy = SG.battle.enemies[i].hitbox();
+		var enemies = SG.battle.enemies;
+		for (var i = 0; i < enemies.length; i++) {
+			var enemy = enemies[i].hitbox();
+			// ghetto fix to prevent enemeis from checking themselves
 			if (hitbox.br.x == enemy.br.x && hitbox.bl.y == enemy.bl.y) {
-				return false; // ghetto fix to self check
+				return false;
 			}
-			for (var i = 0; i < SG.collisions.corners.length; i++) {
-				if (hitbox[SG.collisions.corners[i]].x <= enemy.br.x && hitbox[SG.collisions.corners[i]].x >= enemy.tl.x &&
-					hitbox[SG.collisions.corners[i]].y <= enemy.br.y && hitbox[SG.collisions.corners[i]].y >= enemy.tl.y) {
-					return true
+			for (var j = 0; j < SG.collisions.corners.length; j++) {
+				if (hitbox[SG.collisions.corners[j]].x <= enemy.br.x && hitbox[SG.collisions.corners[j]].x >= enemy.tl.x &&
+					hitbox[SG.collisions.corners[j]].y <= enemy.br.y && hitbox[SG.collisions.corners[j]].y >= enemy.tl.y) {
+					console.log(enemy)
+					console.log(enemies[i]);
+					return enemies[i];
 				}
 			}
 		}
@@ -357,17 +390,11 @@ SG.collisions = {
 SG.battle = {
 	enemies: [],
 	initialize: function() {
-		var test = new BattleEntity(500, 60);
-		test.assets = 'player';
-		test.offsetX = 16;
-		test.offsetY = 9;
-		test.updateFrame = SG.player.updateFrame;
-		test.getSprite = SG.player.getSprite;
-		SG.battle.enemies.push(test);
+		SG.battle.spawnEnemy(500, 0, 'player', 60, 60, 18, 9);
 	},
 
-	spawn_enemy: function() {
-		// get from shits
+	spawnEnemy: function(x, y, assets, width, height, offsetX, offsetY) {
+		SG.battle.enemies.push(new BattleEntity(x, y, assets, width, height, offsetX, offsetY));
 	},
 
 	update: function() {
@@ -384,5 +411,7 @@ socket.on('echo', function(data) {
 	console.log(data);
 	console.log('packet recieved');
 });
-
+socket.on('ping', function(time) {
+	console.log(Date.now()-time);
+});
 SG.initialize();
